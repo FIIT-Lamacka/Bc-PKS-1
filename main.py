@@ -113,8 +113,3 @@ if __name__ == '__main__':
     packets = load_pcap()
     new_packet = create_frame(packets[0])
     new_packet.print_info()
-
-    
-
-
-

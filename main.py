@@ -36,21 +36,31 @@ class FrameEth2(Frame):
             if (x+1) % 32 == 0 and x != 0:
                 data += "\n"
         print(data)
+        print("==================================================\n\n")
 
 
-class FrameIEEE(Frame):
+class FrameSNAP(Frame):
     def __init__(self, source_mac, dest_mac, length):
         super().__init__(source_mac, dest_mac, length)
+        self.dsap = None
+        self.ssap = None
+        self.control = None
+        self.vendor_code = None
+        self.ethertype = None
 
 
 class FrameLLC(Frame):
     def __init__(self, source_mac, dest_mac, length):
         super().__init__(source_mac, dest_mac, length)
+        self.dsap = None
+        self.ssap = None
+        self.control = None
 
 
 class FrameRAW(Frame):
     def __init__(self, source_mac, dest_mac, length):
         super().__init__(source_mac, dest_mac, length)
+        self.ipx_header = None
 
 
 def get_byte(hex_string, pos):
@@ -82,6 +92,30 @@ def extract_typelenght(hex_string):
     return get_byte(hex_string, 12) + get_byte(hex_string, 13)
 
 
+def extract_dsap(hex_string):
+    return get_byte(hex_string, 14)
+
+
+def extract_ssap(hex_string):
+    return get_byte(hex_string, 15)
+
+
+def extract_control(hex_string):
+    return get_byte(hex_string, 16)
+
+
+def extract_vendor(hex_string):
+    return get_byte(hex_string, 17) + get_byte(hex_string, 18) + get_byte(hex_string, 19)
+
+
+def extract_802_ethertype(hex_string):
+    return get_byte(hex_string, 20) + get_byte(hex_string, 21)
+
+
+def extract_ipxheader(hex_string):
+    return get_byte(hex_string, 14) + get_byte(hex_string, 15) + get_byte(hex_string, 16)
+
+
 def load_pcap():
     files = os.listdir("to_translate")
     pcap_packets = []
@@ -107,9 +141,51 @@ def create_frame(packet):
         new_frame_object.raw = packet
 
         return new_frame_object
+    else:
+        diff = get_byte(packet, 14) + get_byte(packet, 15)
+        if int(diff, 16) == 0xAAAA:
+            new_frame_object = FrameSNAP(source_mac, dest_mac, length)
+            new_frame_object.data = packet[44:]
+            new_frame_object.raw = packet
+            new_frame_object.dsap = extract_dsap(packet)
+            new_frame_object.ssap = extract_ssap(packet)
+            new_frame_object.control = extract_control(packet)
+            new_frame_object.vendor_code = extract_vendor(packet)
+            new_frame_object.ethertype = extract_802_ethertype(packet)
+            return new_frame_object
+
+        elif int(diff, 16) == 0xFFFF:
+            new_frame_object = FrameRAW(source_mac, dest_mac, length)
+            new_frame_object.data = packet[34:]
+            new_frame_object.raw = packet
+            new_frame_object.ipx_header = extract_ipxheader(packet)
+            return new_frame_object
+
+        else:
+            new_frame_object = FrameLLC(source_mac, dest_mac, length)
+            new_frame_object.data = packet[34:]
+            new_frame_object.raw = packet
+            new_frame_object.dsap = extract_dsap(packet)
+            new_frame_object.ssap = extract_ssap(packet)
+            new_frame_object.control = extract_control(packet)
+            return new_frame_object
 
 
 if __name__ == '__main__':
     packets = load_pcap()
-    new_packet = create_frame(packets[0])
-    new_packet.print_info()
+
+    processed_packets = []
+    for packet in packets:
+        processed_packets.append(create_frame(packet))
+
+    #for x in range(10):
+        #processed_packets[0].print_info()
+
+
+    found = []
+    for packet in processed_packets:
+        if isinstance(packet, FrameEth2):
+            found.append(packet)
+
+    print(len(found))
+

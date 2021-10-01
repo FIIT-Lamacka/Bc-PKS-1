@@ -170,7 +170,6 @@ def create_frame(packet):
             new_frame_object.control = extract_control(packet)
             return new_frame_object
 
-
 if __name__ == '__main__':
     packets = load_pcap()
 

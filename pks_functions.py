@@ -1,12 +1,15 @@
 from pks_frame_classes import *
 from scapy.compat import bytes_hex
 from scapy.all import rdpcap
+
 import os
+
+
 
 
 def get_byte(hex_string, pos):
     pos *= 2
-    return chr(hex_string[pos]) + chr(hex_string[pos+1])
+    return chr(hex_string[pos]) + chr(hex_string[pos + 1])
 
 
 def extract_destination(hex_string):
@@ -21,7 +24,7 @@ def extract_destination(hex_string):
 
 def extract_source(hex_string):
     string = ""
-    for i in range(7, 12):
+    for i in range(6, 12):
         string += get_byte(hex_string, i)
         if i != 11:
             string += ":"
@@ -58,6 +61,7 @@ def extract_ipxheader(hex_string):
 
 
 def load_pcap():
+    # file loading stackoverflow.com
     files = os.listdir("to_translate")
     pcap_packets = []
     for name in files:
@@ -87,8 +91,6 @@ def analyze_ipv4(data):
     new_packet.raw = data
     new_packet.data = data[40:]
 
-    print(new_packet.data)
-
     return new_packet
 
 
@@ -113,9 +115,9 @@ def create_frame(packet, frame_id):
     dest_mac = extract_destination(packet)
     source_mac = extract_source(packet)
     typelen = extract_typelenght(packet)
-    length = int(len(packet)/2)
+    length = int(len(packet) / 2)
 
-    if int(typelen, 16) > 600:
+    if int(typelen, 16) > 0x600:
         new_frame_object = FrameEth2(source_mac, dest_mac, length, typelen)
         new_frame_object.data = packet[28:]
         new_frame_object.raw = packet

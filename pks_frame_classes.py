@@ -1,9 +1,10 @@
 from independent_functions import *
 import configparser
-
+from colorama import *
 
 config = configparser.ConfigParser()
 config.read("config.conf")
+init()
 
 
 class Frame:
@@ -23,21 +24,22 @@ class FrameEth2(Frame):
         self.eth_type = eth_type
 
     def print_info(self):
-        print("Frame number: " + str(self.id))
+        print(Fore.GREEN + "Frame number: " + Style.RESET_ALL + str(self.id))
         print("Destination adress: " + self.dest_mac.upper())
         print("Source adress: " + self.source_mac.upper())
         print("Frame type: Ethernet II")
-        print("EtherType: 0x" + self.eth_type)
-        medium_l = str(64) if self.length + 4 < 64 else str(self.length+4)
+        medium_l = str(64) if self.length + 4 < 64 else str(self.length + 4)
         print("Frame length: " + str(self.length) + "; Length in medium: " + medium_l)
+        print("EtherType: 0x" + self.eth_type)
         try:
             print("Nested protocol: " + config["EtherType"][str(self.eth_type).upper()])
         except KeyError:
-            print("Nested protocol: PROTOCOL NOT FOUND")
+            print(Back.RED + Fore.BLACK + "Nested protocol: PROTOCOL NOT FOUND" + Style.RESET_ALL)
 
         if isinstance(self.nested_packet, PacketIPv4):
             print("")
             self.nested_packet.print_info()
+            print("")
 
         print(prettify_data(self.raw))
         print("==================================================\n\n")
@@ -56,7 +58,7 @@ class FrameSNAP(Frame):
         print("Frame number: " + str(self.id))
         print("Destination adress: " + self.dest_mac.upper())
         print("Source adress: " + self.source_mac.upper())
-        print("Frame type: IEEE 802.2 SNAP")
+        print("Frame type: IEEE 802.3 SNAP")
         print("Length: " + str(self.length))
         medium_l = str(64) if self.length + 4 < 64 else str(self.length + 4)
         print("Frame length: " + str(self.length) + "; Length in medium: " + medium_l)
@@ -78,7 +80,7 @@ class FrameLLC(Frame):
         print("Frame number: " + str(self.id))
         print("Destination adress: " + self.dest_mac.upper())
         print("Source adress: " + self.source_mac.upper())
-        print("Frame type: IEEE 802.2 LLC")
+        print("Frame type: IEEE 802.3 LLC")
         print("Length: " + str(self.length))
         medium_l = str(64) if self.length + 4 < 64 else str(self.length + 4)
         print("Frame length: " + str(self.length) + "; Length in medium: " + medium_l)
@@ -101,7 +103,7 @@ class FrameRAW(Frame):
         print("Frame number: " + str(self.id))
         print("Destination adress: " + self.dest_mac.upper())
         print("Source adress: " + self.source_mac.upper())
-        print("Frame type: IEEE 802.2 RAW")
+        print("Frame type: IEEE 802.3 RAW")
         medium_l = str(64) if self.length + 4 < 64 else str(self.length+4)
         print("Length: " + str(self.length))
         print("Frame length: " + str(self.length) + "; Length in medium: " + medium_l)

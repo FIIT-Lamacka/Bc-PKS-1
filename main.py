@@ -21,9 +21,3 @@ if __name__ == '__main__':
         processed_packets[x].print_info()
     '''
 
-    '''found = []
-    for packet in processed_packets:
-        if isinstance(packet, FrameRAW):
-            found.append(packet)
-
-    print(len(found))'''

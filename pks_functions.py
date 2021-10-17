@@ -5,8 +5,6 @@ from scapy.all import rdpcap
 import os
 
 
-
-
 def get_byte(hex_string, pos):
     pos *= 2
     return chr(hex_string[pos]) + chr(hex_string[pos + 1])
@@ -74,6 +72,23 @@ def load_pcap():
     return raw_packets
 
 
+def print_packets(packets):
+    for packet in packets:
+        packet.print_info()
+
+
+def analyze():
+    packets = load_pcap()
+
+    processed_packets = []
+
+    i = 1
+    for packet in packets:
+        processed_packets.append(create_frame(packet, i))
+        i += 1
+
+    return processed_packets
+
 def read_hex(data, start, length):
     stop = start + length
     return data[start:stop]
@@ -89,7 +104,13 @@ def hex_to_ipv4(data):
 def analyze_ipv4(data):
     new_packet = PacketIPv4(hex_to_ipv4(read_hex(data, 24, 8)), hex_to_ipv4(read_hex(data, 32, 8)))
     new_packet.raw = data
-    new_packet.data = data[40:]
+    header_lenght = int(read_hex(data, 1, 1), 16) * 4
+
+    new_packet.data = data[header_lenght*2:]
+    new_packet.nested_protocol = read_hex(data, 18, 2)
+    print(new_packet.nested_protocol)
+
+
 
     return new_packet
 

@@ -119,6 +119,7 @@ class PacketIPv4:
         self.dest_ip = dest_ip
         self.header_length = None
         self.total_lenght = None
+        self.nested_protocol = None
         self.raw = None
         self.data = None
 

@@ -41,6 +41,14 @@ class FrameEth2(Frame):
             self.nested_packet.print_info()
             print("")
 
+            if isinstance(self.nested_packet.nested, TCP):
+                print("")
+                self.nested_packet.nested.print_info()
+                print("")
+
+
+
+
         print(prettify_data(self.raw))
         print("==================================================\n\n")
 
@@ -104,7 +112,7 @@ class FrameRAW(Frame):
         print("Destination adress: " + self.dest_mac.upper())
         print("Source adress: " + self.source_mac.upper())
         print("Frame type: IEEE 802.3 RAW")
-        medium_l = str(64) if self.length + 4 < 64 else str(self.length+4)
+        medium_l = str(64) if self.length + 4 < 64 else str(self.length + 4)
         print("Length: " + str(self.length))
         print("Frame length: " + str(self.length) + "; Length in medium: " + medium_l)
         print("Nested protocol: IPx")
@@ -120,9 +128,93 @@ class PacketIPv4:
         self.header_length = None
         self.total_lenght = None
         self.nested_protocol = None
+        self.nested = None
         self.raw = None
         self.data = None
 
     def print_info(self):
         print("Source IP address: " + self.source_ip)
         print("Destination IP address: " + self.dest_ip)
+        if self.nested_protocol is not None:
+            print("\nLayer 4 protocol: ", self.nested_protocol)
+
+
+class TCP:
+    def __init__(self):
+        self.source_port = None
+        self.dest_port = None
+        self.flags = None
+
+    def print_info(self):
+        print("Source port: ", self.source_port)
+        print("Destination port: ", self.dest_port)
+        print("Flags: " ,build_tcp_flags(self.flags))
+
+
+class UDP:
+    def __init__(self):
+        self.source_port = None
+        self.dest_port = None
+
+    def print_info(self):
+        print("Source port: ", self.source_port)
+        print("Destination port: ", self.dest_port)
+
+
+class Communication:
+    def __init__(self, add1, add2, port1, port2):
+        self.add1 = add1
+        self.add2 = add2
+        self.port1 = port1
+        self.port2 = port2
+        self.coms = []
+
+    def equals(self, add1, add2, port1, port2):
+        if self.add1 == add1 or self.add1 == add2:
+            if self.add2 == add1 or self.add2 == add2:
+                if self.port1 == port1 or self.port1 == port2:
+                    if self.port2 == port1 or self.port2 == port2:
+                        return True
+
+        # print("FALSE:" + " " + self.add1 + " "+ self.add2 + " "+ str(self.port1) + " "+ str(self.port2) + " "+ add1
+        # + " "+ add2 + " "+ str(port1) + " "+ str(port2))
+        return False
+
+    def print_pairs(self):
+        for packet in self.coms:
+            packet.print_info()
+
+
+    def print_ommited(self):
+        for i in range(10):
+            self.coms[i].print_info()
+
+        print(Fore.GREEN + "=================\nOUTPUT SHORTENED\n=================\n")
+
+        for x in range(10):
+            i = (len(self.coms)-10) + x
+            self.coms[i].print_info()
+
+
+    def is_complete(self):
+        #print(build_tcp_flags(self.coms[0].nested_packet.nested.flags), build_tcp_flags(self.coms[1].nested_packet.nested.flags), build_tcp_flags(self.coms[2].nested_packet.nested.flags), end=" ")
+
+        if len(self.coms) < 3:
+            return False
+
+        if "SYN" in build_tcp_flags(self.coms[0].nested_packet.nested.flags) and "SYN" in build_tcp_flags(self.coms[1].nested_packet.nested.flags) and "ACK" in build_tcp_flags(self.coms[1].nested_packet.nested.flags) and "ACK" in build_tcp_flags(self.coms[2].nested_packet.nested.flags):
+            com_len = len(self.coms) - 1
+            if "ACK" in build_tcp_flags(self.coms[com_len].nested_packet.nested.flags) and "FIN" in build_tcp_flags(
+                    self.coms[com_len - 1].nested_packet.nested.flags) and "ACK" in build_tcp_flags(
+                    self.coms[com_len - 2].nested_packet.nested.flags) and "FIN" in build_tcp_flags(
+                    self.coms[com_len - 3].nested_packet.nested.flags):
+                return True
+            if "ACK" in build_tcp_flags(self.coms[com_len].nested_packet.nested.flags) and "FIN" in build_tcp_flags(
+                self.coms[com_len - 1].nested_packet.nested.flags) and "ACK" in build_tcp_flags(
+                self.coms[com_len - 1].nested_packet.nested.flags) and "FIN" in build_tcp_flags(
+                self.coms[com_len - 2].nested_packet.nested.flags):
+                return True
+            if "RST" in build_tcp_flags(self.coms[com_len].nested_packet.nested.flags):
+                return True
+        print("FALSE")
+        return False

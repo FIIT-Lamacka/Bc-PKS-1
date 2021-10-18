@@ -5,6 +5,7 @@ from scapy.all import rdpcap
 import os
 
 
+
 def get_byte(hex_string, pos):
     pos *= 2
     return chr(hex_string[pos]) + chr(hex_string[pos + 1])
@@ -89,6 +90,7 @@ def analyze():
 
     return processed_packets
 
+
 def read_hex(data, start, length):
     stop = start + length
     return data[start:stop]
@@ -101,6 +103,91 @@ def hex_to_ipv4(data):
            str(int(data[6:8], 16))
 
 
+def sort_ipport_pairs(packets):
+
+    pairs = []
+    unfound = True
+
+    for packet in packets:
+        unfound = True
+        for com in pairs:
+            if com.equals(packet.nested_packet.source_ip, packet.nested_packet.dest_ip,
+                            packet.nested_packet.nested.source_port, packet.nested_packet.nested.dest_port):
+                com.coms.append(packet)
+                unfound = False
+                break
+        if unfound:
+            com = Communication(packet.nested_packet.source_ip, packet.nested_packet.dest_ip,
+                                packet.nested_packet.nested.source_port, packet.nested_packet.nested.dest_port)
+            com.coms.append(packet)
+            pairs.append(com)
+
+    return pairs
+
+
+def find_packets_by_port(packets,port):
+    found_packets = []
+    for packet in packets:
+        if packet.nested_packet is not None and packet.nested_packet.nested is not None:
+            if packet.nested_packet.nested.source_port == port or packet.nested_packet.nested.dest_port == port:
+                found_packets.append(packet)
+
+    return found_packets
+
+
+def print_complete_and_incomplete(complete, incomplete):
+    if complete is not None:
+
+        print(Fore.CYAN, "=======================================\nCOMPLETE COMMUNICATION\n=======================================\n", Style.RESET_ALL)
+        if len(complete.coms) > 20:
+            complete.print_ommited()
+        else:
+            complete.print_pairs()
+    else:
+        print(Fore.YELLOW + "Complete communication not found." + Style.RESET_ALL)
+
+    print(Fore.CYAN,
+          "=======================================\nINCOMPLETE COMMUNICATION\n=======================================\n",
+          Style.RESET_ALL)
+    if incomplete is not None:
+        if len(incomplete.coms) > 20:
+            incomplete.print_ommited()
+        else:
+            incomplete.print_pairs()
+    else:
+        print(Fore.YELLOW + "Incomplete communication not found." + Style.RESET_ALL)
+
+
+def com_custom(packets, error, port):
+    http_packets = find_packets_by_port(packets, port)
+    if len(http_packets) == 0:
+        print(error)
+        return
+
+    pairs = sort_ipport_pairs(http_packets)
+
+    complete = None
+    incomplete = None
+    for pair in pairs:
+        if pair.is_complete():
+            if complete is None:
+                complete = pair
+        else:
+            if incomplete is None:
+                incomplete = pair
+
+    print_complete_and_incomplete(complete, incomplete)
+
+
+def analyze_tcp(data):
+    new_frame = TCP()
+    new_frame.source_port = int(read_hex(data, 0, 4),16)
+    new_frame.dest_port = int(read_hex(data, 4, 4), 16)
+    new_frame.flags = read_hex(data, 25, 3)
+
+    return new_frame
+
+
 def analyze_ipv4(data):
     new_packet = PacketIPv4(hex_to_ipv4(read_hex(data, 24, 8)), hex_to_ipv4(read_hex(data, 32, 8)))
     new_packet.raw = data
@@ -108,9 +195,14 @@ def analyze_ipv4(data):
 
     new_packet.data = data[header_lenght*2:]
     new_packet.nested_protocol = read_hex(data, 18, 2)
-    print(new_packet.nested_protocol)
+    try:
+        new_packet.nested_protocol = config["IPV4_PROTOCOL"][new_packet.nested_protocol.decode("ascii").upper()]
 
+    except KeyError:
+        new_packet.nested_protocol = read_hex(data, 18, 2)
 
+    if new_packet.nested_protocol == "TCP":
+        new_packet.nested = analyze_tcp(new_packet.data)
 
     return new_packet
 
@@ -181,3 +273,71 @@ def create_frame(packet, frame_id):
             new_frame_object.id = frame_id
 
             return new_frame_object
+
+def initUI():
+    processed_packets = None
+
+    while True:
+        print(Fore.GREEN + "INPUT 'help' FOR LIST OF COMMANDS" + Style.RESET_ALL)
+        command = input("> ")
+        command.lower()
+
+        if command == "load" or command == "l":
+            processed_packets = analyze()
+            print("All packets have been loaded succesfully!")
+
+        elif command == "communications" or command == "c":
+            if processed_packets is None:
+                print(
+                    Fore.RED + "No .pcap file parsed yet! Use command \"load\" to parse pcap files!" + Style.RESET_ALL)
+                continue
+            print("Communications of which protocol would you like to analyze?\n"
+                  " 1. HTTP \n 2. HTTPS \n 3. TELNET \n 4. SSH \n 5. FTP Control \n 6. FTP Data \n 7. TFTP \n 8. ICMP "
+                  "\n 9. ARP  ")
+            to_anal = input("> ")
+
+            if to_anal == "1" or to_anal.upper() == "HTTP":
+                com_custom(processed_packets, "NO HTTP PACKETS", 80)
+
+            if to_anal == "2" or to_anal.upper() == "HTTPS":
+                com_custom(processed_packets, "NO HTTPS PACKETS", 443)
+
+            if to_anal == "3" or to_anal.upper() == "TELNET":
+                com_custom(processed_packets, "NO TELNET PACKETS", 23)
+
+            if to_anal == "4" or to_anal.upper() == "SSH":
+                com_custom(processed_packets, "NO SSH PACKETS", 22)
+
+            if to_anal == "5" or to_anal.upper() == "FTP CONTROL":
+                com_custom(processed_packets, "NO FTP COMMAND PACKETS", 21)
+
+
+
+        elif command == "print" or command == "p":
+            if processed_packets is None:
+                print(
+                    Fore.RED + "No .pcap file parsed yet! Use command \"load\" to parse pcap files!" + Style.RESET_ALL)
+                continue
+            print_packets(processed_packets)
+
+        elif command == "print -s" or command == "ps":
+            if processed_packets is None:
+                print(
+                    Fore.RED + "No .pcap file parsed yet! Use command \"load\" to parse pcap files!" + Style.RESET_ALL)
+                continue
+            no = input("Which packet to analyze <1-" + str(len(processed_packets)) + ">?\n")
+            try:
+                processed_packets[int(no) - 1].print_info()
+            except IndexError:
+                print(Fore.RED + "Unknown value entered!" + Style.RESET_ALL)
+            except ValueError:
+                print(Fore.RED + "Unknown value entered!" + Style.RESET_ALL)
+
+        elif command == "histogram" or command == "hist" or command == "hi":
+            if processed_packets is None:
+                print(
+                    Fore.RED + "No .pcap file parsed yet! Use command \"load\" to parse pcap files!" + Style.RESET_ALL)
+                continue
+            ipv4_histogram(processed_packets)
+        else:
+            print(Fore.RED + "Unknown command!" + Style.RESET_ALL)

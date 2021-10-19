@@ -2,11 +2,13 @@ from independent_functions import *
 import configparser
 from colorama import *
 
+# INITIATION OF THE CONFIG.CONF PARSER
 config = configparser.ConfigParser()
 config.read("config.conf")
 init()
 
 
+# CLASS FOR A GENERAL FRAME OBJECT, ISNT USED ONLY INHERITED
 class Frame:
     def __init__(self, source_mac, dest_mac, length):
         self.source_mac = source_mac
@@ -18,6 +20,7 @@ class Frame:
         self.nested_packet = None
 
 
+# CLASS FOR ETHERNET II PACKETS
 class FrameEth2(Frame):
     def __init__(self, source_mac, dest_mac, length, eth_type):
         super().__init__(source_mac, dest_mac, length)
@@ -32,27 +35,30 @@ class FrameEth2(Frame):
         print("Frame length: " + str(self.length) + "; Length in medium: " + medium_l)
         print("EtherType: 0x" + self.eth_type)
         try:
-            print("Nested protocol: " + config["EtherType"][str(self.eth_type).upper()])
+            print("\nNested protocol: " + config["EtherType"][str(self.eth_type).upper()])
         except KeyError:
             print(Back.RED + Fore.BLACK + "Nested protocol: PROTOCOL NOT FOUND" + Style.RESET_ALL)
 
         if isinstance(self.nested_packet, PacketIPv4):
-            print("")
             self.nested_packet.print_info()
-            print("")
 
             if isinstance(self.nested_packet.nested, TCP):
-                print("")
                 self.nested_packet.nested.print_info()
-                print("")
 
+            if isinstance(self.nested_packet.nested, UDP):
+                self.nested_packet.nested.print_info()
 
+            if isinstance(self.nested_packet.nested, ICMP):
+                self.nested_packet.nested.print_info()
 
+        if isinstance(self.nested_packet, ARP):
+            self.nested_packet.print_info()
 
-        print(prettify_data(self.raw))
+        print("\n"+prettify_data(self.raw))
         print("==================================================\n\n")
 
 
+# CLASS FOR 802.3 SNAP CLASS PACKET OBJECTS
 class FrameSNAP(Frame):
     def __init__(self, source_mac, dest_mac, length):
         super().__init__(source_mac, dest_mac, length)
@@ -73,10 +79,16 @@ class FrameSNAP(Frame):
         print("DSAP: " + self.dsap + "; SSAP: " + self.ssap + "; Control: " + self.control)
         print("Vendor Code: " + self.vendor_code + "; EtherType: " + self.ethertype)
 
+        try:
+            print("\nNested protocol: " + config["EtherType"][str(self.ethertype).upper()])
+        except KeyError:
+            print(Back.RED + Fore.BLACK + "Nested protocol: PROTOCOL NOT FOUND" + Style.RESET_ALL)
+
         print(prettify_data(self.raw))
         print("==================================================\n\n")
 
 
+# CLASS FOR 802.3 LLC CLASS PACKET OBJECTS
 class FrameLLC(Frame):
     def __init__(self, source_mac, dest_mac, length):
         super().__init__(source_mac, dest_mac, length)
@@ -102,6 +114,7 @@ class FrameLLC(Frame):
         print("==================================================\n\n")
 
 
+# CLASS FOR 802.3 RAW CLASS PACKET OBJECTS
 class FrameRAW(Frame):
     def __init__(self, source_mac, dest_mac, length):
         super().__init__(source_mac, dest_mac, length)
@@ -121,6 +134,7 @@ class FrameRAW(Frame):
         print("==================================================\n\n")
 
 
+# CLASS FOR IPv4 PACKET OBJECTS
 class PacketIPv4:
     def __init__(self, source_ip, dest_ip):
         self.source_ip = source_ip
@@ -139,6 +153,26 @@ class PacketIPv4:
             print("\nLayer 4 protocol: ", self.nested_protocol)
 
 
+# CLASS FOR ARP PACKET OBJECTS
+class ARP:
+    def __init__(self):
+        self.sha = None
+        self.spa = None
+        self.tha = None
+        self.tpa = None
+        self.operation = None
+        self.has_pair = False
+
+    def print_info(self):
+        print("Sender hardware address: " + self.sha + " Sender protocol address: " + str(self.spa))
+        print("Targer hardware address: " + self.tha + " Target protocol address: " + str(self.tpa))
+        if int(self.operation, 16) == 1:
+            print("Operation: REQUEST")
+        elif int(self.operation, 16) == 2:
+            print("Operation: REPLY")
+
+
+# CLASS FOR TCP FRAME OBJECTS
 class TCP:
     def __init__(self):
         self.source_port = None
@@ -148,9 +182,10 @@ class TCP:
     def print_info(self):
         print("Source port: ", self.source_port)
         print("Destination port: ", self.dest_port)
-        print("Flags: " ,build_tcp_flags(self.flags))
+        print("Flags: ", build_tcp_flags(self.flags))
 
 
+# CLASS FOR IPv4 FRAME OBJECTS
 class UDP:
     def __init__(self):
         self.source_port = None
@@ -161,6 +196,22 @@ class UDP:
         print("Destination port: ", self.dest_port)
 
 
+# CLASS FOR IPv4 FRAME OBJECTS
+class ICMP:
+    def __init__(self):
+        self.type = None
+        self.code = None
+
+    def print_info(self):
+        print("Type: " + self.type.decode("utf-8") + " Code: ", self.code.decode("utf-8"))
+        try:
+            print("Control message: "
+                  + config["ICMP_TYPE"][(self.type.decode("utf-8")+self.code.decode("utf-8")).upper()])
+        except KeyError:
+            print(Fore.RED + "Control message: UNKNOWN" + Style.RESET_ALL)
+
+
+# HELPER CLASS FOR STORING COMMUNICATIONS BETWEEN TWO PROCESSES
 class Communication:
     def __init__(self, add1, add2, port1, port2):
         self.add1 = add1
@@ -169,6 +220,7 @@ class Communication:
         self.port2 = port2
         self.coms = []
 
+    # IS A COMMUNICATION WITH GIVEN PARAMETERS EQUAL TO THIS ONE?
     def equals(self, add1, add2, port1, port2):
         if self.add1 == add1 or self.add1 == add2:
             if self.add2 == add1 or self.add2 == add2:
@@ -180,11 +232,12 @@ class Communication:
         # + " "+ add2 + " "+ str(port1) + " "+ str(port2))
         return False
 
+    # PRINT ALL MESSAGES IN THIS COMMUNICATION
     def print_pairs(self):
         for packet in self.coms:
             packet.print_info()
 
-
+    # PRINT 20 MESSAGES FROM THIS COMMUNICATION
     def print_ommited(self):
         for i in range(10):
             self.coms[i].print_info()
@@ -195,26 +248,60 @@ class Communication:
             i = (len(self.coms)-10) + x
             self.coms[i].print_info()
 
-
+    # IF A COMMUNICATION IS COMPLETE RETURNS TRUE
     def is_complete(self):
-        #print(build_tcp_flags(self.coms[0].nested_packet.nested.flags), build_tcp_flags(self.coms[1].nested_packet.nested.flags), build_tcp_flags(self.coms[2].nested_packet.nested.flags), end=" ")
+        # print(build_tcp_flags(self.coms[0].nested_packet.nested.flags),
+        # build_tcp_flags(self.coms[1].nested_packet.nested.flags),
+        # build_tcp_flags(self.coms[2].nested_packet.nested.flags), end=" ")
 
         if len(self.coms) < 3:
             return False
 
-        if "SYN" in build_tcp_flags(self.coms[0].nested_packet.nested.flags) and "SYN" in build_tcp_flags(self.coms[1].nested_packet.nested.flags) and "ACK" in build_tcp_flags(self.coms[1].nested_packet.nested.flags) and "ACK" in build_tcp_flags(self.coms[2].nested_packet.nested.flags):
+        if "SYN" in build_tcp_flags(self.coms[0].nested_packet.nested.flags) \
+                and "SYN" in build_tcp_flags(self.coms[1].nested_packet.nested.flags) \
+                and "ACK" in build_tcp_flags(self.coms[1].nested_packet.nested.flags) \
+                and "ACK" in build_tcp_flags(self.coms[2].nested_packet.nested.flags):
             com_len = len(self.coms) - 1
-            if "ACK" in build_tcp_flags(self.coms[com_len].nested_packet.nested.flags) and "FIN" in build_tcp_flags(
-                    self.coms[com_len - 1].nested_packet.nested.flags) and "ACK" in build_tcp_flags(
-                    self.coms[com_len - 2].nested_packet.nested.flags) and "FIN" in build_tcp_flags(
-                    self.coms[com_len - 3].nested_packet.nested.flags):
+            if "ACK" in build_tcp_flags(self.coms[com_len].nested_packet.nested.flags) \
+                    and "FIN" in build_tcp_flags(self.coms[com_len - 1].nested_packet.nested.flags) \
+                    and "ACK" in build_tcp_flags(self.coms[com_len - 2].nested_packet.nested.flags) \
+                    and "FIN" in build_tcp_flags(self.coms[com_len - 3].nested_packet.nested.flags):
                 return True
-            if "ACK" in build_tcp_flags(self.coms[com_len].nested_packet.nested.flags) and "FIN" in build_tcp_flags(
-                self.coms[com_len - 1].nested_packet.nested.flags) and "ACK" in build_tcp_flags(
-                self.coms[com_len - 1].nested_packet.nested.flags) and "FIN" in build_tcp_flags(
-                self.coms[com_len - 2].nested_packet.nested.flags):
+            if "ACK" in build_tcp_flags(self.coms[com_len].nested_packet.nested.flags) \
+                    and "FIN" in build_tcp_flags(self.coms[com_len - 1].nested_packet.nested.flags) \
+                    and "ACK" in build_tcp_flags(self.coms[com_len - 1].nested_packet.nested.flags) \
+                    and "FIN" in build_tcp_flags(self.coms[com_len - 2].nested_packet.nested.flags):
                 return True
             if "RST" in build_tcp_flags(self.coms[com_len].nested_packet.nested.flags):
                 return True
         print("FALSE")
         return False
+
+
+# COMMUNICATION OBJECT FOR UDP COMMUNICATION STORING
+class CommunicationUDP:
+    def __init__(self, lead):
+        self.lead = lead
+        self.coms = []
+
+    def print_ommited(self):
+        print(Fore.LIGHTBLUE_EX + "=================\n\n=================\n" + Style.RESET_ALL)
+        if len(self.coms) > 20:
+            for i in range(10):
+                self.coms[i].print_info()
+
+            print(Fore.GREEN + "=================\nOUTPUT SHORTENED\n=================\n")
+
+            for x in range(10):
+                i = (len(self.coms)-10) + x
+                self.coms[i].print_info()
+        else:
+            for com in self.coms:
+                com.print_info()
+
+
+# HELPER FUNCTION FOR HELPING TO STORE ARP PAIRS
+class ARPPair:
+    def __init__(self, request, reply):
+        self.request = request
+        self.reply = reply

@@ -38,3 +38,13 @@ def build_tcp_flags(flags):
     final += "]"
 
     return final
+
+
+def macify(raw):
+    clone = raw.decode("utf-8").upper()
+    return clone[0:2] + ":" + clone[2:4] + ":" + clone[4:6] + ":" + clone[6:8] + ":" + clone[8:10] + ":" + clone[10:12]
+
+
+def ipify(raw):
+    return str(int(raw[0:2], 16)) + "." + str(int(raw[2:4], 16)) + "." + str(int(raw[4:6], 16)) \
+           + "." + str(int(raw[6:8], 16))

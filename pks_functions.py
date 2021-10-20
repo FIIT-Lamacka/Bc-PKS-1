@@ -167,7 +167,10 @@ def tftp_find(udp_packets):
 def find_packets_by_port(packets, port):
     found_packets = []
     for packet in packets:
-        if packet.nested_packet is not None and packet.nested_packet.nested is not None:
+        if packet.nested_packet is not None \
+                and not isinstance(packet.nested_packet, ARP) \
+                and not isinstance(packet.nested_packet.nested, ICMP) \
+                and packet.nested_packet.nested is not None:
             if packet.nested_packet.nested.source_port == port or packet.nested_packet.nested.dest_port == port:
                 found_packets.append(packet)
 
@@ -176,11 +179,10 @@ def find_packets_by_port(packets, port):
 
 # PRINT GIVEN COMPLETE AND INCOMPLETE COMMUNICATIONS (UI)
 def print_complete_and_incomplete(complete, incomplete):
+    print(Fore.CYAN,
+          "=====================================\nCOMPLETE COMMUNICATION\n=====================================\n",
+          Style.RESET_ALL)
     if complete is not None:
-
-        print(Fore.CYAN,
-              "=====================================\nCOMPLETE COMMUNICATION\n=====================================\n",
-              Style.RESET_ALL)
         if len(complete.coms) > 20:
             complete.print_ommited()
         else:
@@ -216,8 +218,9 @@ def com_custom(packets, error, port):
             if complete is None:
                 complete = pair
         else:
-            if incomplete is None:
-                incomplete = pair
+            if pair.is_incomplete():
+                if incomplete is None:
+                    incomplete = pair
 
     print_complete_and_incomplete(complete, incomplete)
 
@@ -227,7 +230,10 @@ def com_tftp(packets):
     udp_packets = []
 
     for packet in packets:
-        if packet.nested_packet is not None and packet.nested_packet.nested is not None and isinstance(
+        if packet.nested_packet is not None \
+                and not isinstance(packet.nested_packet, ARP) \
+                and packet.nested_packet.nested is not None \
+                and isinstance(
                 packet.nested_packet.nested, UDP):
             udp_packets.append(packet)
 
@@ -241,8 +247,10 @@ def com_tftp(packets):
 def com_icmp(packets):
     icmp_packets = []
     for packet in packets:
-        if packet.nested_packet is not None and packet.nested_packet.nested is not None and isinstance(
-                packet.nested_packet.nested, ICMP):
+        if packet.nested_packet is not None \
+                and not isinstance(packet.nested_packet, ARP)  \
+                and  packet.nested_packet.nested is not None \
+                and isinstance(packet.nested_packet.nested, ICMP):
             icmp_packets.append(packet)
 
     for icmp in icmp_packets:
@@ -281,7 +289,7 @@ def com_arp(packets):
             if request.nested_packet.tpa == reply.nested_packet.spa and \
                     request.nested_packet.spa == reply.nested_packet.tpa and \
                     reply.nested_packet.tha == request.nested_packet.sha and \
-                    request.id < reply.id and not reply.nested_packet.has_pair:
+                    request.id < reply.id and not reply.nested_packet.has_pair and not request.nested_packet.has_pair:
                 reply.nested_packet.has_pair = True
                 request.nested_packet.has_pair = True
                 arp_pairs.append(ARPPair(request, reply))
